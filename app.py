@@ -24,7 +24,13 @@ def _is_bad_title(title: str) -> bool:
 
 def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     wikipedia.set_lang("en")
-    queries = [industry, f"{industry} industry", f"{industry} market"]
+    queries = [
+        industry,
+        f"{industry} industry",
+        f"{industry} market",
+        f"global {industry}",
+        f"{industry} value chain",
+    ]
 
     seen_titles = set()
     candidates: List[Dict[str, str]] = []
