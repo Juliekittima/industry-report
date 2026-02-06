@@ -142,7 +142,7 @@ WIKIPEDIA SNIPPETS:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        max_completion_tokens=650,
+        max_completion_tokens=2000,
     )
 
 
