@@ -6,6 +6,10 @@ import streamlit as st
 import wikipedia
 from openai import OpenAI
 
+# ----------------------------
+# Step 1 helpers: validation & normalisation
+# ----------------------------
+
 BAD_INPUTS = {"", "hi", "hello", "test", "asdf", "help", "idk", "none"}
 
 def is_valid_industry(text: str) -> bool:
@@ -17,6 +21,24 @@ def is_valid_industry(text: str) -> bool:
     if re.fullmatch(r"[\d\W_]+", t):
         return False
     return True
+
+
+def ensure_industry_context(text: str) -> str:
+    """
+    If user does not specify industry/market/sector,
+    automatically append 'industry'.
+    """
+    t = text.strip().lower()
+    industry_terms = ["industry", "market", "sector", "value chain"]
+
+    if any(term in t for term in industry_terms):
+        return text.strip()
+
+    return f"{text.strip()} industry"
+
+# ----------------------------
+# Step 2 helpers: Wikipedia retrieval
+# ----------------------------
 
 def _is_bad_title(title: str) -> bool:
     t = title.lower().strip()
@@ -63,11 +85,22 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     candidates.sort(key=lambda x: len(x["content"]), reverse=True)
     return candidates[:limit]
 
-
+# ----------------------------
+# Step 3 helpers: reporting
+# ----------------------------
 def split_sentences(text: str) -> List[str]:
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     return [s for s in sentences if s]
 
+def trim_to_word_limit(text: str, limit: int) -> str:
+    words = text.split()
+    if len(words) <= limit:
+        return text
+    return " ".join(words[:limit])
+
+
+def word_count(text: str) -> int:
+    return len(text.split())
 
 def build_extractive_report(industry: str, pages: List[Dict[str, str]]) -> str:
     lines = []
@@ -154,19 +187,9 @@ WIKIPEDIA SNIPPETS:
 
     return trim_to_word_limit(resp.choices[0].message.content.strip(), 500)
 
-
-
-def trim_to_word_limit(text: str, limit: int) -> str:
-    words = text.split()
-    if len(words) <= limit:
-        return text
-    return " ".join(words[:limit])
-
-
-def word_count(text: str) -> int:
-    return len(text.split())
-
-
+# ----------------------------
+# Streamlit UI
+# ----------------------------
 st.set_page_config(page_title="Market Research Assistant", layout="centered")
 
 st.title("Market Research Assistant")
