@@ -142,7 +142,6 @@ WIKIPEDIA SNIPPETS:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        temperature=0.2,
         max_completion_tokens=650,
     )
 
