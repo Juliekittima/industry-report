@@ -143,8 +143,9 @@ WIKIPEDIA SNIPPETS:
             {"role": "user", "content": user},
         ],
         temperature=0.2,
-        max_tokens=650,  # cost control + helps keep <500 words
+        max_completion_tokens=650,
     )
+
 
     return trim_to_word_limit(resp.choices[0].message.content.strip(), 500)
 
