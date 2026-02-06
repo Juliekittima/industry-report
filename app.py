@@ -204,6 +204,11 @@ if st.button("Generate report"):
             "Please enter a valid industry (e.g. 'electric vehicles', 'insurance', 'UK coffee shops')."
         )
         st.stop()
+    # Step 1b: auto-append 'industry' if missing
+    industry = ensure_industry_context(industry)
+
+    st.subheader("Step 1: Industry validated ✅")
+    st.write(f"Interpreted industry query: **{industry}**")
 
     try:
         pages = search_wikipedia(industry.strip(), limit=5)
