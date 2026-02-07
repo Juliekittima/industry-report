@@ -83,7 +83,19 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
 
     # rank by longer content (simple + explainable)
     candidates.sort(key=lambda x: len(x["content"]), reverse=True)
-    return candidates[:limit]
+    if len(candidates) >= limit:
+        return candidates[:limit]
+    
+    # If not enough relevant pages, return what we have (>=3 preferred)
+    if len(candidates) >= 3:
+        raise ValueError(
+            f"Only {len(candidates)} relevant industry-level Wikipedia pages were found."
+        )
+    
+    # Too few to be useful
+    raise ValueError(
+        "Insufficient relevant Wikipedia pages found for this industry query."
+    )
 
 # ----------------------------
 # Step 3 helpers: reporting
@@ -212,6 +224,14 @@ if st.button("Generate report"):
 
     try:
         pages = search_wikipedia(industry.strip(), limit=5)
+        partial = False
+    except ValueError as exc:
+        # Graceful degradation: use fewer pages if available
+        st.warning(
+            f"{exc} Showing available pages instead."
+        )
+        pages = search_wikipedia(industry.strip(), limit=4)
+        partial = True
     except Exception as exc:
         st.error(f"Wikipedia search failed: {exc}")
         st.stop()
@@ -221,6 +241,12 @@ if st.button("Generate report"):
         st.stop()
 
     st.subheader("Step 2: Top 5 Relevant Wikipedia Pages")
+    if partial:
+        st.info(
+            "Fewer than five highly relevant industry-level Wikipedia pages were available. "
+            "The report below is generated using the most relevant sources found."
+        )
+
     for page in pages:
         st.write(page["url"])
 
