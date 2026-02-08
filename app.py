@@ -232,15 +232,20 @@ WIKIPEDIA SNIPPETS:
 
 def embed_reference_links(text: str, ref_map: Dict[str, str]) -> str:
     """
-    Converts [1], [2], etc. into clickable Markdown links.
+    Converts [1][2] into [1], [2] with clickable Markdown links.
     """
+    # First, insert a comma + space between adjacent citations
+    text = re.sub(r"\]\[", "], [", text)
+
+    # Then convert each [n] into a markdown link
     for ref_id, url in ref_map.items():
         text = re.sub(
-            rf"\[{ref_id}\]",
+            rf"\[{re.escape(ref_id)}\]",
             f"[{ref_id}]({url})",
             text
         )
     return text
+
 
 
 # ----------------------------
