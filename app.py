@@ -174,18 +174,35 @@ Write an industry report for: {industry}
 Requirements:
 - Under 450 words (hard limit: must be under 500).
 - Use ONLY the snippets below.
-- Include citations [1]..[5] to show which snippet supports each point.
-- Structure:
-  1) Overview (1-2 sentences)
-  2) Market structure / value chain
-  3) Key segments / products
-  4) Demand drivers & constraints
-  5) Trends / near-term outlook
-  6) 3-5 bullet takeaways
+- Include citations [1]..[5].
+- Use professional business language.
+
+Formatting rules (IMPORTANT):
+- Each section header MUST be on its own line.
+- Each section header MUST be in **bold Markdown**.
+- Insert a blank line after each header.
+- Do NOT include numbering or parentheses in headers.
+- Content must start on the line AFTER the header.
+
+Required structure (use EXACT headers):
+
+**Overview**
+
+**Market structure / value chain**
+
+**Key segments / products**
+
+**Demand drivers & constraints**
+
+**Trends / near-term outlook**
+
+**Key takeaways**
+(use bullet points)
 
 WIKIPEDIA SNIPPETS:
 {sources}
 """.strip()
+
 
     resp = client.chat.completions.create(
         model=model_name,
