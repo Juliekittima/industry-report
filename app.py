@@ -159,6 +159,12 @@ def build_llm_report(industry: str, pages: List[Dict[str, str]]) -> str:
         doc_blurbs.append(f"[{i}] {title}\nURL: {url}\nSNIPPET: {snippet}\n")
 
     sources = "\n".join(doc_blurbs)
+    
+    # Build reference mapping for citations
+    reference_map = {
+        str(i): page["url"]
+        for i, page in enumerate(pages, start=1)
+    }
 
     system = (
         "You are a market research assistant. "
@@ -174,7 +180,9 @@ Write an industry report for: {industry}
 Requirements:
 - Under 450 words (hard limit: must be under 500).
 - Use ONLY the snippets below.
-- Include citations [1]..[5].
+- Use citation markers like [1], [2], etc.
+- Each citation MUST be written exactly as: [1], [2], etc. (no text inside).
+- Citations will be converted into clickable links automatically.
 - Use professional business language.
 
 Formatting rules (IMPORTANT):
@@ -214,7 +222,26 @@ WIKIPEDIA SNIPPETS:
     )
 
 
-    return trim_to_word_limit(resp.choices[0].message.content.strip(), 500)
+    text = resp.choices[0].message.content.strip()
+    
+    # Embed clickable reference links
+    text = embed_reference_links(text, reference_map)
+    
+    return trim_to_word_limit(text, 500)
+
+
+def embed_reference_links(text: str, ref_map: Dict[str, str]) -> str:
+    """
+    Converts [1], [2], etc. into clickable Markdown links.
+    """
+    for ref_id, url in ref_map.items():
+        text = re.sub(
+            rf"\[{ref_id}\]",
+            f"[{ref_id}]({url})",
+            text
+        )
+    return text
+
 
 # ----------------------------
 # Streamlit UI
