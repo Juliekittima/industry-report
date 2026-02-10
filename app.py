@@ -10,24 +10,9 @@ import streamlit as st
 import wikipedia
 from openai import OpenAI
 
-
 # ============================
 # Step 1: Input validation & normalisation
 # ============================
-
-BAD_INPUTS = {"", "hi", "hello", "test", "asdf", "help", "idk", "none"}
-
-def is_valid_industry(text: str) -> bool:
-    """Basic sanity checks to reject empty or meaningless inputs."""
-    t = (text or "").strip().lower()
-    if t in BAD_INPUTS:
-        return False
-    if len(t) < 3:
-        return False
-    if re.fullmatch(r"[\d\W_]+", t):
-        return False
-    return True
-
 
 def ensure_industry_context(text: str) -> str:
     """
