@@ -129,6 +129,7 @@ def _is_bad_title(title: str) -> bool:
 
 def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     wikipedia.set_lang("en")
+
     queries = [
         industry,
         f"{industry} industry",
@@ -138,37 +139,37 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     ]
 
     seen_titles = set()
-    candidates: List[Dict[str, str]] = []
+    results: List[Dict[str, str]] = []
 
     for q in queries:
         try:
-            results = wikipedia.search(q, results=10)
+            search_results = wikipedia.search(q, results=10)
         except Exception:
             continue
 
-        for title in results:
+        for title in search_results:
             if title in seen_titles or _is_bad_title(title):
                 continue
+
             try:
                 page = wikipedia.page(title, auto_suggest=False, redirect=True)
                 content = (page.content or "").strip()
                 if len(content) < 800:
                     continue
-                candidates.append({"title": page.title, "url": page.url, "content": content[:4000]})
+
+                results.append({
+                    "title": page.title,
+                    "url": page.url,
+                    "content": content[:3000],  # cost control
+                })
                 seen_titles.add(title)
             except Exception:
                 continue
 
-            if len(candidates) >= 15:
-                break
-        if len(candidates) >= 15:
-            break
+            if len(results) >= limit:
+                return results  # IMPORTANT: keep Wikipedia’s ranking order
 
-    # rank by longer content (simple + explainable)
-    candidates.sort(key=lambda x: len(x["content"]), reverse=True)
-    
-    # Return up to `limit` if available, otherwise return what we have (no exception)
-    return candidates[:min(limit, len(candidates))]
+    return results
 
 # ----------------------------
 # Step 3 helpers: reporting
