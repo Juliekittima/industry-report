@@ -54,12 +54,21 @@ COMMON_INDUSTRIES = [
 
 def correct_industry_spelling(text: str) -> str:
     """
-    Corrects minor spelling mistakes using conservative fuzzy matching.
-    Leaves unknown/niche terms unchanged.
+    Correct minor spelling mistakes conservatively.
+    If the input ends with 'industry', correct the base term and keep suffix.
     """
-    t = (text or "").strip().lower()
-    matches = get_close_matches(t, COMMON_INDUSTRIES, n=1, cutoff=0.85)
-    return matches[0] if matches else text.strip()
+    raw = (text or "").strip()
+    t = raw.lower()
+
+    has_industry = t.endswith(" industry")
+    base = t[:-9].strip() if has_industry else t  # remove " industry"
+
+    matches = get_close_matches(base, [x for x in COMMON_INDUSTRIES if "industry" not in x], n=1, cutoff=0.80)
+    if matches:
+        corrected_base = matches[0]
+        return f"{corrected_base} industry" if has_industry else corrected_base
+
+    return raw
 
 # ----------------------------
 # Step 2 helpers: Wikipedia retrieval
@@ -290,7 +299,8 @@ if st.button("Generate report"):
             "Please enter a valid industry (e.g. 'electric vehicles', 'insurance', 'UK coffee shops')."
         )
         st.stop()
-    # Step 1b: spelling correction (minor typos only)
+        
+    # Step 1b: spelling correction (before appending 'industry')
     corrected = correct_industry_spelling(industry)
     if corrected.lower() != industry.strip().lower():
         st.info(f"Corrected industry spelling to: **{corrected}**")
@@ -298,7 +308,7 @@ if st.button("Generate report"):
     
     # Step 1c: auto-append 'industry' if missing
     industry = ensure_industry_context(industry)
-
+    
     st.subheader("Step 1: Industry validated ✅")
     st.write(f"Interpreted industry query: **{industry}**")
 
