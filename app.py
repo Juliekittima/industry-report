@@ -85,8 +85,21 @@ Return ONLY valid JSON with:
         max_tokens=500,
     )
 
+    raw = resp.choices[0].message.content or ""
+    
+    # Extract first JSON object from the response
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    
+    if not match:
+        return {
+            "is_industry": "false",
+            "corrected": "",
+            "message": "Could not validate input. Please re-enter a clearer industry.",
+            "suggestions": [],
+        }
+    
     try:
-        return json.loads(resp.choices[0].message.content)
+        data = json.loads(match.group())
     except Exception:
         return {
             "is_industry": "false",
@@ -94,6 +107,15 @@ Return ONLY valid JSON with:
             "message": "Could not validate input. Please re-enter a clearer industry.",
             "suggestions": [],
         }
+    
+    # Normalise fields safely
+    return {
+        "is_industry": str(data.get("is_industry", "false")).lower(),
+        "corrected": str(data.get("corrected", "")).strip(),
+        "message": str(data.get("message", "")).strip(),
+        "suggestions": data.get("suggestions", []) if isinstance(data.get("suggestions", []), list) else [],
+    }
+
 
 
 # ============================
