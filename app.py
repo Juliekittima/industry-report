@@ -117,19 +117,9 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
 
     # rank by longer content (simple + explainable)
     candidates.sort(key=lambda x: len(x["content"]), reverse=True)
-    if len(candidates) >= limit:
-        return candidates[:limit]
     
-    # If not enough relevant pages, return what we have (>=3 preferred)
-    if len(candidates) >= 3:
-        raise ValueError(
-            f"Only {len(candidates)} relevant industry-level Wikipedia pages were found."
-        )
-    
-    # Too few to be useful
-    raise ValueError(
-        "Insufficient relevant Wikipedia pages found for this industry query."
-    )
+    # Return up to `limit` if available, otherwise return what we have (no exception)
+    return candidates[:min(limit, len(candidates))]
 
 # ----------------------------
 # Step 3 helpers: reporting
@@ -312,19 +302,24 @@ if st.button("Generate report"):
     st.subheader("Step 1: Industry validated ✅")
     st.write(f"Interpreted industry query: **{industry}**")
 
-    try:
-        pages = search_wikipedia(industry.strip(), limit=5)
-        partial = False
-    except ValueError as exc:
-        # Graceful degradation: use fewer pages if available
+    pages = search_wikipedia(industry.strip(), limit=5)
+
+    if len(pages) < 5:
         st.warning(
-            f"{exc} Showing available pages instead."
+            f"Only {len(pages)} relevant Wikipedia pages were found for this query. "
+            "The report will be generated using the available sources."
         )
-        pages = search_wikipedia(industry.strip(), limit=4)
         partial = True
-    except Exception as exc:
-        st.error(f"Wikipedia search failed: {exc}")
+    else:
+        partial = False
+    
+    if len(pages) < 3:
+        st.error(
+            "Not enough relevant Wikipedia pages were found to generate a reliable report. "
+            "Try a different spelling or a more specific industry term (e.g., 'bubble tea', 'bubble tea market')."
+        )
         st.stop()
+
 
     if not pages:
         st.info("No Wikipedia pages found for that industry. Try a different industry term.")
