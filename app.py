@@ -5,6 +5,7 @@ from typing import List, Dict
 import streamlit as st
 import wikipedia
 from openai import OpenAI
+from difflib import get_close_matches
 
 # ----------------------------
 # Step 1 helpers: validation & normalisation
@@ -22,7 +23,6 @@ def is_valid_industry(text: str) -> bool:
         return False
     return True
 
-
 def ensure_industry_context(text: str) -> str:
     """
     If user does not specify industry/market/sector,
@@ -35,6 +35,31 @@ def ensure_industry_context(text: str) -> str:
         return text.strip()
 
     return f"{text.strip()} industry"
+
+# Spelling correction
+
+COMMON_INDUSTRIES = [
+    "food", "food industry",
+    "insurance", "insurance industry",
+    "healthcare", "healthcare industry",
+    "technology", "technology industry",
+    "finance", "financial services",
+    "retail", "energy", "manufacturing",
+    "automotive", "electric vehicles",
+    "telecommunications", "banking",
+    "construction", "education",
+    "hospitality", "logistics",
+    "transportation",
+]
+
+def correct_industry_spelling(text: str) -> str:
+    """
+    Corrects minor spelling mistakes using conservative fuzzy matching.
+    Leaves unknown/niche terms unchanged.
+    """
+    t = (text or "").strip().lower()
+    matches = get_close_matches(t, COMMON_INDUSTRIES, n=1, cutoff=0.85)
+    return matches[0] if matches else text.strip()
 
 # ----------------------------
 # Step 2 helpers: Wikipedia retrieval
@@ -265,7 +290,13 @@ if st.button("Generate report"):
             "Please enter a valid industry (e.g. 'electric vehicles', 'insurance', 'UK coffee shops')."
         )
         st.stop()
-    # Step 1b: auto-append 'industry' if missing
+    # Step 1b: spelling correction (minor typos only)
+    corrected = correct_industry_spelling(industry)
+    if corrected.lower() != industry.strip().lower():
+        st.info(f"Corrected industry spelling to: **{corrected}**")
+    industry = corrected
+    
+    # Step 1c: auto-append 'industry' if missing
     industry = ensure_industry_context(industry)
 
     st.subheader("Step 1: Industry validated ✅")
@@ -312,5 +343,5 @@ if st.button("Generate report"):
         st.caption("Set OPENAI_API_KEY to enable LLM summarization.")
 
     st.subheader("Step 3: Industry Report")
-    st.write(report)
+    st.markdown(report)
     st.caption(f"Word count: {word_count(report)} (max 500)")
