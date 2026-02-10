@@ -4,6 +4,7 @@ from typing import List, Dict
 
 import streamlit as st
 import wikipedia
+import json
 from openai import OpenAI
 from difflib import get_close_matches
 
@@ -36,39 +37,87 @@ def ensure_industry_context(text: str) -> str:
 
     return f"{text.strip()} industry"
 
-# Spelling correction
-
-COMMON_INDUSTRIES = [
-    "food", "food industry",
-    "insurance", "insurance industry",
-    "healthcare", "healthcare industry",
-    "technology", "technology industry",
-    "finance", "financial services",
-    "retail", "energy", "manufacturing",
-    "automotive", "electric vehicles",
-    "telecommunications", "banking",
-    "construction", "education",
-    "hospitality", "logistics",
-    "transportation",
-]
-
-def correct_industry_spelling(text: str) -> str:
+def llm_validate_and_fix_industry(user_text: str) -> Dict[str, str]:
     """
-    Correct minor spelling mistakes conservatively.
-    If the input ends with 'industry', correct the base term and keep suffix.
+    Uses an LLM to:
+    - decide if input is a valid industry/market/sector concept
+    - correct typos / incomplete inputs into a better industry query
+    If not valid, returns suggestions and asks user to re-input.
     """
-    raw = (text or "").strip()
-    t = raw.lower()
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        # No API key: fall back to original text (no LLM validation)
+        return {
+            "is_industry": "true",
+            "corrected": user_text.strip(),
+            "message": "LLM validation skipped (no OPENAI_API_KEY)."
+        }
 
-    has_industry = t.endswith(" industry")
-    base = t[:-9].strip() if has_industry else t  # remove " industry"
+    client = OpenAI(api_key=api_key)
 
-    matches = get_close_matches(base, [x for x in COMMON_INDUSTRIES if "industry" not in x], n=1, cutoff=0.80)
-    if matches:
-        corrected_base = matches[0]
-        return f"{corrected_base} industry" if has_industry else corrected_base
+    system = (
+        "You validate user inputs for an industry market research tool. "
+        "Your job: decide if the user input represents an industry/market/sector. "
+        "If the input is a company/brand/product/person/place or too vague, mark it NOT an industry. "
+        "If it's close, correct typos and rewrite into a clear industry query."
+    )
 
-    return raw
+    user = f"""
+User input: "{user_text}"
+
+Return ONLY valid JSON (no markdown) with keys:
+- is_industry: true/false
+- corrected: string (if is_industry true, a corrected industry query, e.g. "bubble tea market", "luxury sports car industry")
+- message: short string explaining what you did
+- suggestions: array of 2-3 alternative industry queries (strings)
+
+Rules:
+- If it looks like a brand/company (e.g., "Lamborghini"), set is_industry=false and suggest the market/industry instead.
+- Correct obvious typos (e.g., "insurence" -> "insurance").
+- If too generic (e.g., "food"), make it more industry-like (e.g., "food industry" or "food and beverage industry").
+- Keep it short (max 6 words for corrected).
+""".strip()
+
+    resp = client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        # GPT-5 mini: no temperature; use max_completion_tokens
+        max_completion_tokens=400,
+    )
+
+    raw = (resp.choices[0].message.content or "").strip()
+    if not raw:
+        return {
+            "is_industry": "false",
+            "corrected": "",
+            "message": "Validation returned empty output. Please re-enter a clearer industry.",
+            "suggestions": []
+        }
+
+    try:
+        data = json.loads(raw)
+    except Exception:
+        # If model returns slightly non-JSON, fail safely
+        return {
+            "is_industry": "false",
+            "corrected": "",
+            "message": "Could not parse validation result. Please re-enter a clearer industry.",
+            "suggestions": []
+        }
+
+    # Normalise types
+    data["is_industry"] = str(data.get("is_industry", "false")).lower()
+    data["corrected"] = str(data.get("corrected", "")).strip()
+    data["message"] = str(data.get("message", "")).strip()
+    data["suggestions"] = data.get("suggestions", [])
+    if not isinstance(data["suggestions"], list):
+        data["suggestions"] = []
+
+    return data
+
 
 # ----------------------------
 # Step 2 helpers: Wikipedia retrieval
@@ -283,24 +332,32 @@ st.write("Provide an industry to generate a Wikipedia-based market research repo
 industry = st.text_input("Industry")
 
 if st.button("Generate report"):
-    # Step 1: Industry validation (Q1)
+    # Step 1: basic validation
     if not is_valid_industry(industry):
-        st.warning(
-            "Please enter a valid industry (e.g. 'electric vehicles', 'insurance', 'UK coffee shops')."
-        )
+        st.warning("Please enter a valid industry (e.g. 'insurance', 'bubble tea', 'electric vehicles').")
         st.stop()
-        
-    # Step 1b: spelling correction (before appending 'industry')
-    corrected = correct_industry_spelling(industry)
-    if corrected.lower() != industry.strip().lower():
-        st.info(f"Corrected industry spelling to: **{corrected}**")
-    industry = corrected
-    
-    # Step 1c: auto-append 'industry' if missing
+
+    # Step 1b: LLM validate + correct (typos/incomplete/not industry)
+    v = llm_validate_and_fix_industry(industry)
+
+    if v["is_industry"] != "true":
+        st.warning(v.get("message") or "This does not look like an industry. Please re-enter.")
+        sugg = v.get("suggestions", [])
+        if sugg:
+            st.write("Try one of these instead:")
+            for s in sugg:
+                st.write(f"- {s}")
+        st.stop()
+
+    # Use corrected query
+    industry = v["corrected"] if v["corrected"] else industry.strip()
+
+    # Step 1c: ensure industry context (append industry if missing)
     industry = ensure_industry_context(industry)
-    
+
     st.subheader("Step 1: Industry validated ✅")
     st.write(f"Interpreted industry query: **{industry}**")
+
 
     pages = search_wikipedia(industry.strip(), limit=5)
 
