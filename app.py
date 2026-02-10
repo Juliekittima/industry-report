@@ -112,6 +112,18 @@ def _is_bad_title(title: str) -> bool:
     t = title.lower()
     return "(disambiguation)" in t or t == "disambiguation"
 
+def title_matches_query(title: str, query: str) -> bool:
+    """
+    Title-only filter: keep titles that contain at least one key query token.
+    """
+    t = title.lower()
+    tokens = [x for x in re.findall(r"[a-z0-9]+", query.lower()) if len(x) >= 4]
+
+    # Avoid over-filtering very short queries
+    if not tokens:
+        return True
+
+    return any(tok in t for tok in tokens)
 
 def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     """
@@ -142,6 +154,8 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
 
         for title in results:
             if title in seen or _is_bad_title(title):
+                continue
+            if not title_matches_query(title, industry):
                 continue
             try:
                 page = wikipedia.page(title, auto_suggest=False, redirect=True)
@@ -242,8 +256,8 @@ st.write("Provide an industry to generate a Wikipedia-based market research repo
 industry = st.text_input("Industry")
 
 if st.button("Generate report"):
-    if not is_valid_industry(industry):
-        st.warning("Please enter a valid industry (e.g. insurance, bubble tea, electric vehicles).")
+    if not industry.strip():
+        st.warning("Please enter an industry.")
         st.stop()
 
     # LLM validation & correction
