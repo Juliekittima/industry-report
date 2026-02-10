@@ -135,12 +135,16 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     wikipedia.set_lang("en")
 
     queries = [
-        industry,
-        f"{industry} industry",
-        f"{industry} market",
-        f"global {industry}",
-        f"{industry} value chain",
+        industry,                         # "hospitality industry"
+        f"global {industry}",              # "global hospitality industry"
+        f"{industry} market",              # "hospitality industry market"
+        f"{industry} sector",              # "hospitality industry sector"
+        f"{industry} value chain",         # "hospitality industry value chain"
+        f"{industry} supply chain",        # "hospitality industry supply chain"
+        f"{industry} services",            # "hospitality industry services"
+        f"{industry} overview",            # "hospitality industry overview"
     ]
+
 
     seen = set()
     pages: List[Dict[str, str]] = []
