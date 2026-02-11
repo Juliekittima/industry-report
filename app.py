@@ -114,16 +114,25 @@ def _is_bad_title(title: str) -> bool:
 
 def title_matches_query(title: str, query: str) -> bool:
     """
-    Title-only filter: keep titles that contain at least one key query token.
+    Title-only relevance:
+    - Require a match on a meaningful token (ignore generic words like 'industry').
     """
     t = title.lower()
     tokens = [x for x in re.findall(r"[a-z0-9]+", query.lower()) if len(x) >= 4]
 
-    # Avoid over-filtering very short queries
+    # Remove generic tokens that cause false matches (e.g., "semiconductor industry")
+    generic = {
+        "industry", "market", "sector", "global", "value", "chain",
+        "supply", "services", "overview"
+    }
+    tokens = [tok for tok in tokens if tok not in generic]
+
+    # Avoid over-filtering if nothing meaningful remains
     if not tokens:
         return True
 
     return any(tok in t for tok in tokens)
+
 
 def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     """
