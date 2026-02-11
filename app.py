@@ -112,26 +112,33 @@ def _is_bad_title(title: str) -> bool:
     t = title.lower()
     return "(disambiguation)" in t or t == "disambiguation"
 
-def title_matches_query(title: str, query: str) -> bool:
+def relevance_score(query: str, title: str, content: str) -> float:
     """
-    Title-only relevance:
-    - Require a match on a meaningful token (ignore generic words like 'industry').
+    Simple, explainable relevance score:
+    - strong weight on title matches
+    - lighter weight on content matches
+    - ignores generic business words
     """
-    t = title.lower()
-    tokens = [x for x in re.findall(r"[a-z0-9]+", query.lower()) if len(x) >= 4]
+    q_tokens = [t for t in re.findall(r"[a-z0-9]+", query.lower()) if len(t) >= 4]
 
-    # Remove generic tokens that cause false matches (e.g., "semiconductor industry")
+    # Ignore generic words that cause noise
     generic = {
-        "industry", "market", "sector", "global", "value", "chain",
-        "supply", "services", "overview"
+        "industry", "market", "sector", "global",
+        "value", "chain", "supply", "services", "overview"
     }
-    tokens = [tok for tok in tokens if tok not in generic]
+    q_tokens = [t for t in q_tokens if t not in generic]
 
-    # Avoid over-filtering if nothing meaningful remains
-    if not tokens:
-        return True
+    title_l = title.lower()
+    content_l = content.lower()
 
-    return any(tok in t for tok in tokens)
+    score = 0.0
+
+    for tok in q_tokens:
+        if tok in title_l:
+            score += 5.0              # strong signal
+        score += min(content_l.count(tok), 5) * 0.5  # weaker signal
+
+    return score
 
 
 def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
@@ -139,18 +146,16 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
     Retrieve up to `limit` Wikipedia pages using Wikipedia's own ranking.
     """
     wikipedia.set_lang("en")
-
     queries = [
         industry,
+        f"{industry} industry",
         f"{industry} market",
-        f"{industry} sector",
         f"global {industry}",
-        f"{industry} supply chain",
         f"{industry} value chain",
     ]
 
-    seen = set()
-    pages: List[Dict[str, str]] = []
+    seen_titles = set()
+    candidates: List[Dict[str, str]] = []
 
     for q in queries:
         try:
@@ -159,28 +164,30 @@ def search_wikipedia(industry: str, limit: int = 5) -> List[Dict[str, str]]:
             continue
 
         for title in results:
-            if title in seen or _is_bad_title(title):
-                continue
-            if not title_matches_query(title, industry):
+            if title in seen_titles or _is_bad_title(title):
                 continue
             try:
                 page = wikipedia.page(title, auto_suggest=False, redirect=True)
-                if len(page.content or "") < 800:
+                content = (page.content or "").strip()
+                if len(content) < 800:
                     continue
-
-                pages.append({
-                    "title": page.title,
-                    "url": page.url,
-                    "content": page.content[:3000],  # cost control
-                })
-                seen.add(title)
+                candidates.append({"title": page.title, "url": page.url, "content": content[:4000]})
+                seen_titles.add(title)
             except Exception:
                 continue
 
-            if len(pages) >= limit:
-                return pages
+            if len(candidates) >= 15:
+                break
+        if len(candidates) >= 15:
+            break
 
-    return pages
+    # rank by relevance to the industry query
+    candidates.sort(
+        key=lambda x: relevance_score(industry, x["title"], x["content"]),
+        reverse=True
+    )
+    # Always return what we have (up to limit)
+    return candidates[:limit]
 
 
 # ============================
